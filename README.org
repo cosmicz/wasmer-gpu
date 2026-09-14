@@ -119,3 +119,6 @@ another demonstration or a cloud scheduler.
 - [[file:wasmer-gpu-demo/docs/DEMO.org][Bridge API and execution notes]]
 
 Built for the Wasmer sponsor track at the September 2026 AI Security Hackathon.
+
+* License
+MIT. See [[file:LICENSE][LICENSE]].

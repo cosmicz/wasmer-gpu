@@ -24,8 +24,8 @@ dist/
 build/
 target/
 
-# embead
-.claude/settings.local.json
+# Local agent configuration and coordination.
+/.claude/
 .dorg/
 .meld/
 .codex/
