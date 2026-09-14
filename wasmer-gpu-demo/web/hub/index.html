@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wasmer GPU</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <a class="wordmark" href="#image" aria-label="Wasmer GPU home">wasmer<span>gpu</span></a>
+    <div class="tabs" role="tablist" aria-label="Demo applications">
+      <button id="tab-compute" role="tab" aria-controls="panel-compute" aria-selected="false" tabindex="-1" data-app="compute">Compute</button>
+      <button id="tab-image" role="tab" aria-controls="panel-image" aria-selected="true" tabindex="0" data-app="image">Image Lab</button>
+      <button id="tab-mnist" role="tab" aria-controls="panel-mnist" aria-selected="false" tabindex="-1" data-app="mnist">MNIST</button>
+    </div>
+    <span class="local">Running locally</span>
+  </header>
+  <main class="applications">
+    <section id="panel-compute" role="tabpanel" aria-labelledby="tab-compute" hidden>
+      <iframe title="Compute workbench" data-src="/compute/"></iframe>
+    </section>
+    <section id="panel-image" role="tabpanel" aria-labelledby="tab-image">
+      <iframe title="Image Lab" data-src="/image/"></iframe>
+    </section>
+    <section id="panel-mnist" role="tabpanel" aria-labelledby="tab-mnist" hidden>
+      <iframe title="MNIST training and drawing" data-src="/mnist/"></iframe>
+    </section>
+  </main>
+  <noscript>Enable JavaScript, or open <a href="/compute/">Compute</a>, <a href="/image/">Image Lab</a> or <a href="/mnist/">MNIST</a> directly.</noscript>
+</body>
+</html>

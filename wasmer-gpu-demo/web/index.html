@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wasmer GPU — live compute workbench</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="masthead"><a href="/" class="wordmark">wasmer<span>gpu</span></a><span class="local"><i></i> Local compute workbench</span></header>
+  <main>
+    <section class="intro">
+      <h1>Give WebAssembly<br>a GPU.</h1>
+      <p>A Wasmer guest sends work to the native GPU. Watch the result come back, then check it against the CPU.</p>
+    </section>
+    <section class="workbench" aria-label="Live GPU demo">
+      <div class="machine">
+        <div class="machine-heading"><h2>The path to the chip</h2><span id="run-state">Ready to run</span></div>
+        <ol class="pipeline">
+          <li><span class="stage-icon">.wasm</span><div><h3>Wasmer guest</h3><p>Guest-supplied WGSL kernels</p></div><span class="wire" aria-hidden="true"></span></li>
+          <li><span class="stage-icon">⇄</span><div><h3>GPU bridge</h3><p>Upload · dispatch · readback</p></div><span class="wire" aria-hidden="true"></span></li>
+          <li class="gpu-stage"><span class="chip" aria-hidden="true"><span>GPU</span></span><div><h3 id="adapter">Your native GPU</h3><p id="backend">Adapter identified on execution</p></div></li>
+        </ol>
+        <div class="action"><button id="run" type="button">Run on my GPU <span aria-hidden="true">↗</span></button><p>Runs real native compute.<br>No cloud, upload, or browser GPU simulation.</p></div>
+      </div>
+      <div class="result-panel">
+        <h2>Same answer. Two processors.</h2>
+        <label class="kernel-label" for="kernel">Kernel result</label>
+        <select id="kernel" disabled><option>Run the guests to see results</option></select>
+        <p class="hint" id="kernel-detail">One host API, guest-owned shaders, core and WASIX guests. Each run checks all three.</p>
+        <div class="result-row"><span>GPU output</span><output id="gpu">—</output></div>
+        <div class="result-row"><span>CPU reference</span><output id="cpu">—</output></div>
+        <p id="verdict" class="verdict" role="status" aria-live="polite">No result yet. Run the guest to see a live comparison.</p>
+        <div class="receipt"><span>Execution receipt</span><span id="receipt">Not run</span></div>
+        <p class="hint" id="duration">A new executable invocation on every click.</p>
+      </div>
+    </section>
+    <section class="measurements" aria-labelledby="timing-title">
+      <div><h2 id="timing-title">Where the time goes</h2><p>Native host timings for the selected kernel. Pipeline creation is separate from dispatch. Tiny workloads, no speedup claim.</p></div>
+      <dl><div><dt>GPU setup</dt><dd id="setup">—</dd></div><div><dt>Upload</dt><dd id="upload">—</dd></div><div><dt>Pipeline creation</dt><dd id="pipeline">—</dd></div><div><dt>Dispatch total</dt><dd id="compute">—</dd></div><div><dt>Readback</dt><dd id="readback">—</dd></div></dl>
+    </section>
+    <section class="details-grid">
+      <div><h2>Checks, not promises</h2><ul id="checks"><li class="pending">Guest bounds, handles and cleanup checks appear after a run.</li></ul></div>
+      <div><h2>What this proves</h2><p>The browser controls a local process. Wasmer runs core WebAssembly modules and one WASIX command guest, each carrying its own WGSL. The same host bridge connects them to <code>wgpu</code> and the native adapter; the WASIX guest receives it through the runtime's instantiation hook.</p><p>Only owned demo shaders run here. WASIX coverage is one command guest without threads, files or network. This is not a complete WebGPU API, GPU isolation, or distributed training.</p><details><summary>Inspect the raw execution report</summary><pre id="raw">No run captured.</pre></details></div>
+    </section>
+  </main>
+  <footer><span>Built for the Wasmer sponsor track</span><span>Hackathons.team · September 2026</span></footer>
+</body>
+</html>

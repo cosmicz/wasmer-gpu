@@ -1,0 +1,45 @@
+# Private coordination and local evidence are not public demo source.
+.embead/
+.local/
+.evidence/
+
+# Independent sponsor source checkouts; see SPONSORS.org for provenance.
+/sponsors/
+
+# Credentials and machine-local configuration.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.DS_Store
+
+# Common build/runtime caches; no stack selected yet.
+node_modules/
+.venv/
+__pycache__/
+.pytest_cache/
+.cache/
+dist/
+build/
+target/
+
+# embead
+.claude/settings.local.json
+.dorg/
+.meld/
+.codex/
+
+# MNIST downloads and run logs (recorded by digest, never committed)
+wasmer-gpu-demo/data/
+wasmer-gpu-demo/guest/mnist/target/
+
+# Local agent guidance and hackathon coordination; not published source.
+/AGENTS.md
+/CLAUDE.md
+/SPONSORS.org
+/DEVELOPMENT.org
+
+# Preserve rough recording takes locally; publish only the selected clips.
+/recordings/take-1-image-demo.mp4
+/recordings/take-1-mnist-training.mp4

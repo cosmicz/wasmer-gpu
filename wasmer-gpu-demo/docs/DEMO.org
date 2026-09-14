@@ -1,0 +1,98 @@
+#+title: wasmer-gpu demo outline
+#+startup: overview
+
+* Thirty-second path
+1. Guest WAT core modules export ~_start () -> i32~, carry their own WGSL
+   kernel in a data segment, and import the bounded ~wasmer_gpu_v0~ subset:
+   ~buffer_upload~, ~buffer_read~, ~buffer_release~, ~pipeline_create~,
+   ~pipeline_dispatch~ and ~pipeline_release~.
+2. The host runner instantiates each guest with Wasmer, validates guest memory
+   ranges, transfer sizes, shader size, dispatch dimensions, quotas and
+   instance-owned opaque handles, then runs the guest's kernel through ~wgpu~ on
+   the named hardware adapter. The bridge (~src/bridge.rs~) contains no kernel
+   and no kernel-specific branch.
+3. The report shows the adapter/backend, three kernel runs (Collatz from
+   upstream ~hello_compute~ as a core module and again as a WASIX command
+   guest, and the lowbias32 integer hash applied eight times) each matched
+   against an independent CPU reference, nine guest-driven controls
+   (bad ranges and sizes, bad handles, rejected shaders, unaligned read, quota,
+   early exit, leak, trap), and separated setup / upload / pipeline-create /
+   per-dispatch / readback timings. No warm-run or speedup claim is made.
+
+* Command
+#+begin_example sh
+cargo +stable test --manifest-path wasmer-gpu-demo/Cargo.toml
+cargo +stable run --release --bin gpu-smoke --manifest-path wasmer-gpu-demo/Cargo.toml
+cargo +stable run --release --bin gpu-smoke --manifest-path wasmer-gpu-demo/Cargo.toml -- --json
+#+end_example
+
+* Bounded host ABI (~wasmer_gpu_v0~, provisional)
+- Wasmer dependency: upstream Git commit
+  ~6a844cff9bd2eb391ab91b7e41fee94260f0ec46~. The JSON report records the
+  Cargo build host triple because the stable toolchain is not target-pinned.
+- Guest memory is imported (~env.memory~, one page). Pointer, length and
+  dispatch-dimension ~i32~ parameters carry wasm32 unsigned bit patterns.
+- ~buffer_upload(ptr, len) -> handle~: copies guest bytes into a
+  ~STORAGE | COPY_SRC~ device buffer. ~len~ must be nonzero and a multiple of
+  wgpu's ~COPY_BUFFER_ALIGNMENT~ (4 bytes).
+- ~buffer_read(buffer, ptr, len) -> status~: copies the first ~len~ bytes of the
+  buffer back into guest memory; same alignment rule, ~len~ at most the buffer
+  size.
+- ~pipeline_create(ptr, len) -> handle~: reads WGSL text (UTF-8, 1..16 KiB)
+  from guest memory and builds a compute pipeline. Enforced contract: one
+  read-write storage buffer at ~@group(0) @binding(0)~ and a ~@compute~ entry
+  point named ~main~; a shader that declares a different binding kind, a
+  missing ~main~ or invalid WGSL is rejected at creation. The host does not
+  check the WGSL element type: the demo kernels read the buffer as
+  ~array<u32>~, but that is the guest's choice. Guest WGSL is trusted demo
+  input; nothing here can preempt a nonterminating kernel once submitted.
+- ~pipeline_dispatch(pipeline, buffer, x, y, z) -> status~: binds the buffer
+  at binding 0 and dispatches ~x * y * z~ workgroups. Each dimension is
+  1..65535 and the product is at most 65536. Completion is awaited before the
+  call returns.
+- ~buffer_release~ / ~pipeline_release(handle) -> status~.
+- Quotas per guest instance: 8 live buffers, 1 MiB, 4 live pipelines. Every
+  handle the instance still owns is released when the instance is torn down,
+  including after a trap.
+  Handle numbers never restart within a process, and a number issued to
+  another instance is foreign to this one (~-2~) whether or not it was released.
+- Return values: ~0~ success; ~-1~ invalid range, size, alignment or dispatch
+  dimension; ~-2~ handle unknown to this instance, released, or of the wrong
+  kind; ~-3~ captured wgpu allocation or runtime error; ~-4~ instance quota;
+  ~-5~ shader rejected (not UTF-8, WGSL validation, or binding contract).
+  ~buffer_upload~ and ~pipeline_create~ return a positive opaque handle on
+  success. Buffer and pipeline handles share one counter, so they never alias.
+- All device work runs under wgpu error scopes; a validation failure becomes a
+  return code, never a host abort.
+
+* WASIX path
+~src/hook.rs~ implements ~wasmer_wasix::runtime::InstantiationHook~ (the seam
+~wasmer-napi~ uses): ~prepare_imports~ creates one session per instance and
+registers the six imports next to the WASI imports the runtime already
+supplies; ~configure_new_instance~ binds the guest's memory, imported or
+exported. The runner registers the hook on a ~PluggableRuntime~ and
+instantiates ~guest/wasix_collatz.wat~ through ~WasiEnvBuilder~. That guest
+exports its memory, has a void ~_start~ and reports through ~proc_exit~;
+~guest/wasix_leak.wat~ exits without releasing and proves hook-owned
+reclamation. Not exercised: threads, side modules, filesystem, networking.
+
+* Guests
+Kernel guests: ~guest/collatz_valid.wat~ (4 elements, 1 dispatch) and
+~guest/lowbias32_warm.wat~ (8 elements, 8 dispatches on one pipeline so the
+per-dispatch samples show cold versus warm submissions). The WGSL text is a
+data segment in each guest, written one source line per WAT string literal so
+it stays readable. Control guests return ~0~ when every observed code matched
+the documented one, otherwise the number of the failed check.
+
+* Explicit omissions
+- ~wasi-webgpu~ and ~wasi-gfx-runtime~ are references for API/host semantics.
+  The runtime integration here is Wasmer, not Wasmtime or a component engine.
+- Custom ABI rather than a standard WIT interface; no component-model
+  integration. The WASIX coverage is one command guest through the runtime
+  hook, next to the core-module path with hand-built imports.
+- One storage binding, one entry point name, no uniforms, textures, multiple
+  bind groups, graphics, CUDA, zero-copy, GPU preemption or distributed
+  training. Kernels are expected to terminate; nothing here can cancel
+  submitted device work.
+- Timings are host wall-clock on tiny inputs; they are not a speedup claim.
+- No cloud runner, public push, deployment, model call or third-party probing.

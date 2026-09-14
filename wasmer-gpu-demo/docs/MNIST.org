@@ -1,0 +1,102 @@
+#+title: MNIST training through the Wasmer GPU bridge
+#+startup: overview
+
+* What runs
+~gpu-mnist~ (default ~--model cnn~) trains a *small convolutional network*:
+conv 5x5 with 8 filters and ReLU (valid, 24x24x8) -> max-pool 2x2 (12x12x8 =
+1,152 features) -> fully connected 1,152 -> 10 with softmax; 11,738
+parameters; minibatch SGD, batch 64, learning rate 0.1. ~--model softmax~ keeps
+the earlier softmax regression (784 -> 10, 7,850 parameters) and its exact
+CPU-parity check. No framework, no cloud component.
+
+Execution path (both models): ~WasiEnvBuilder~ instantiates the guest (a
+~no_std~ Rust crate built for ~wasm32-unknown-unknown~ with an exported memory
+and ~_start~) on a ~PluggableRuntime~ carrying the ~wasmer_gpu_v0~ bridge
+(~GpuInstantiationHook~) and the demo's ~mnist_demo_v0~ host imports. The
+guest owns the model: it seeds the parameters, uploads one state buffer, and
+for every step writes the minibatch into that GPU-resident buffer and
+dispatches its own WGSL kernels. For the CNN (~guest/mnist-cnn/src/~):
+- ~conv_forward.wgsl~ conv + ReLU, one invocation per output value;
+- ~pool_forward.wgsl~ max-pool with argmax bookkeeping;
+- ~fc_forward.wgsl~ logits, softmax, cross-entropy per sample;
+- ~fc_backward.wgsl~ gradient w.r.t. pooled features (pre-update W2), routed
+  back through the pool argmax and the ReLU mask into ~dconv~;
+- ~fc_update.wgsl~ and ~conv_update.wgsl~ minibatch-mean gradients and SGD
+  steps in place, one invocation per parameter.
+Evaluation dispatches only the three forward kernels. The host feeds raw MNIST
+bytes into guest memory before ~_start~ and receives read-back numbers for
+metrics; it never updates weights.
+
+* Command
+#+begin_example sh
+# once: official IDX files from the CVDF mirror (kept out of Git, digests recorded)
+mkdir -p wasmer-gpu-demo/data/mnist && cd wasmer-gpu-demo/data/mnist && \
+for f in train-images-idx3-ubyte train-labels-idx1-ubyte t10k-images-idx3-ubyte t10k-labels-idx1-ubyte; do \
+  curl -sfL -o $f.gz https://storage.googleapis.com/cvdf-datasets/mnist/$f.gz && gunzip -kf $f.gz; done
+# train the CNN (defaults: 600 steps, batch 64, lr 0.1, 12,000 train / 2,000 test, seed 42)
+cargo +stable run --release --bin gpu-mnist --manifest-path wasmer-gpu-demo/Cargo.toml
+# softmax regression with its CPU-parity check; zero-learning-rate control
+cargo +stable run --release --bin gpu-mnist --manifest-path wasmer-gpu-demo/Cargo.toml -- --model softmax
+cargo +stable run --release --bin gpu-mnist --manifest-path wasmer-gpu-demo/Cargo.toml -- --lr 0 --steps 3 --eval-every 0
+#+end_example
+Flags: ~--model cnn|softmax --steps --batch(1..64) --lr --eval-every
+--progress-every --train --test --seed --data-dir --guest --log-dir~. Output is one JSON object per line
+(~start~, ~progress~, ~eval~, ~check~, ~done~ or ~error~), also appended to
+~data/mnist/runs/run-<epoch>.jsonl~; the ~done~ event names the log path.
+
+Rebuilding a guest after editing its Rust or WGSL (same for ~guest/mnist~):
+#+begin_example sh
+cargo +stable build --release --target wasm32-unknown-unknown --manifest-path wasmer-gpu-demo/guest/mnist-cnn/Cargo.toml
+cp wasmer-gpu-demo/guest/mnist-cnn/target/wasm32-unknown-unknown/release/mnist_cnn_guest.wasm wasmer-gpu-demo/guest/mnist-cnn/mnist_cnn_guest.wasm
+#+end_example
+The committed ~.wasm~ files (6 KB and 17 KB) are what the trainer loads.
+
+* Data
+Source: https://github.com/cvdfoundation/mnist, files from
+~https://storage.googleapis.com/cvdf-datasets/mnist/~. The loader validates the
+IDX magic, counts (60,000 / 10,000), 28x28 dimensions, file lengths and label
+range, and records the SHA-256 of each decompressed file in the ~start~ event.
+Default split: the first 12,000 official training images for training and the
+first 2,000 official test images as the held-out set. The held-out set is never
+trained on; ~eval~ only runs the forward kernel.
+
+* Checks the trainer performs on every run
+- CNN (~check.kind = learning_signals~): parameters reported before and after
+  the first step and at the end; the first step must change them, the final
+  parameters must differ from the initial ones (or be identical with
+  ~--lr 0~), and parameters and the last loss must be finite. There is no
+  device-parity harness for the CNN by direction; learning is judged by the
+  held-out accuracy it reaches.
+- Softmax (~check.kind = cpu_parity_first_update~): the host recomputes the
+  first update in f64 from the same initial parameters and minibatch and
+  compares all 7,850 values (tolerance 1e-4, observed about 1e-8).
+- ~done.live_buffers_after~ / ~live_pipelines_after~ must be 0; non-finite loss
+  is flagged per progress event. The process exits non-zero if a check fails.
+
+* Observed results (Apple M2 Max, Metal, seed 42, 600 steps)
+| model   | first loss | final batch loss | held-out accuracy | runtime |
+| cnn     | 2.282      | 0.099            | 0.9400 (1880/2000) | 20.5 s |
+| softmax | 2.303      | 0.172            | 0.8725 (1745/2000) | 8.4 s  |
+Accuracy is measured on the declared held-out subset and reported as is.
+
+* Bridge addition
+~buffer_write(handle, offset, ptr, len)~ overwrites part of a session-owned
+buffer from guest memory (same alignment, range and ownership rules as upload;
+offset must be 4-byte aligned; awaited before return). Upload buffers now carry
+~COPY_DST~. Bridge defaults are unchanged (1 MiB / 8 buffers / 4 pipelines).
+The softmax state buffer is 235,240 bytes with two pipelines and uses the
+defaults. The CNN state buffer is 3,494,824 bytes (batch activations and
+gradients) with six pipelines, so its session is created with an explicit,
+documented budget of 8 MiB and 8 pipelines (~ModelKind::session_limits~).
+
+* Limits
+- One conv layer; accuracy is what this small network reaches on this subset
+  in 600 steps, reported as measured. No speedup claim: timings are
+  wall-clock around each dispatch on a small model.
+- The guest is a wasm32-unknown-unknown core module run through the WASIX
+  builder with ~proc_exit~; it uses no WASI filesystem or networking.
+- Sequential minibatches in dataset order (no shuffling); one training job at a
+  time; steps are bounded by ~--steps~ (max 100,000). Nothing can preempt a
+  submitted dispatch.
+- Kernels use one storage binding; ~buffer_read~ copies from offset 0, so the
+  layout puts read-back regions first.

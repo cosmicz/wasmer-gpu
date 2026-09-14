@@ -1,0 +1,55 @@
+#+title: Local browser demo
+
+* Run
+From the repository checkout:
+#+begin_example sh
+cargo +stable build --release --locked --manifest-path wasmer-gpu-demo/Cargo.toml
+python3 wasmer-gpu-demo/web/server.py
+#+end_example
+Open http://127.0.0.1:8765 and choose *Run on my GPU*. A prebuilt executable
+may be selected explicitly with ~--binary /absolute/path/to/gpu-smoke~.
+~--port~ changes the loopback port. Stop the server with Ctrl-C.
+
+The browser is a control surface, not the execution backend:
+#+begin_example
+Browser -> loopback HTTP -> gpu-smoke --json -> Wasmer guest -> wgpu -> native GPU
+#+end_example
+Every click invokes the executable again. The receipt identifies that binary
+by SHA-256, not an inferred source commit. The executable also reads its guest
+WAT assets from its build checkout; keep that checkout unchanged while demoing.
+The page consumes the ~75e386d~ report schema: three kernel rows (Collatz as a
+core module, lowbias32 as a core module, Collatz as a WASIX command guest) and
+nine control rows, each tagged with its ~runtime~ (~core~ or ~wasix~). The
+server refuses a report whose rows are missing, duplicated, unexpected, or run
+on the wrong runtime. The result selector switches between captured outputs
+without another GPU request. Pipeline creation and dispatch timings are
+separate. WASIX coverage is one command guest through the runtime hook.
+
+* Bounds
+- Only ~127.0.0.1~, one fixed executable, no command/shader input from HTTP.
+- Host and Origin checked; no CORS or public listener; GET never invokes GPU.
+- One active run; 30-second subprocess timeout. This is not a guarantee that
+  submitted device work can be preempted. Only the owned terminating fixture
+  runs; this is not an untrusted shader service.
+- Nonzero exit, malformed/incomplete report, GPU/CPU mismatch and binary drift
+  fail visibly. Every kernel/control is required; empty arrays cannot pass.
+  Setup, upload, pipeline-creation, per-dispatch, readback and CPU-reference
+  timings must be present as bounded non-negative integers; a report that
+  omits or corrupts them is refused rather than shown as verified.
+- No network assets or frontend dependencies.
+
+* Checks
+#+begin_example sh
+python3 -m unittest discover -s wasmer-gpu-demo/web -p 'test_*.py' -v
+node --check wasmer-gpu-demo/web/app.js
+#+end_example
+The server tests stub only the fixed executable call. A real hardware request
+and browser check are recorded separately on [[bd:aisec-snm]].
+
+* Design
+Glacier ~#e7f1ff~, white ~#fcfdff~, sapphire ~#1848e5~, ink ~#172947~,
+muted slate ~#58677c~, and violet ~#8f62de~ for focus. Avenir/Helvetica carry
+the interface; monospace is confined to code/results. The dominant visual is
+the real guest-to-chip path alongside the CPU comparison, not decorative
+metrics. Idle and failure states display no fabricated result. Narrow layouts
+stack the same controls; motion answers a run and respects reduced motion.

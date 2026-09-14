@@ -1,0 +1,46 @@
+#+title: MNIST training page
+
+* Run
+#+begin_example sh
+cargo +stable build --release --locked --manifest-path wasmer-gpu-demo/Cargo.toml
+python3 wasmer-gpu-demo/web/mnist/server.py            # http://127.0.0.1:8767
+#+end_example
+Requires the MNIST files under ~wasmer-gpu-demo/data/mnist~ (see
+[[file:../../docs/MNIST.org][MNIST.org]] for the download and digests).
+~--binary~ and ~--data-dir~ select the executable and dataset explicitly;
+~--port~ changes the loopback port.
+
+*Train on my GPU* starts one owned ~gpu-mnist~ process with fixed arguments
+(default model: the small CNN; 600 steps, evaluation every 50, progress every 5). The page polls
+~/api/events~ and renders only what the trainer printed: the loss trace and
+metrics from ~progress~/~eval~, the 24 held-out digits' predictions from
+~predictions~ (a GPU forward pass after each evaluation), the CPU-check
+verdict from ~check~, the final state from ~done~. *Stop* terminates the owned
+process; *Reset* stops and clears everything. A non-zero exit or a failed
+check shows as a failure, never as a result.
+
+The drawing pad classifies a 28x28 sketch in the browser with the ~weights~
+event (conv, pool and fc in JavaScript for the CNN layout; matrix product for
+the softmax layout), labelled as CPU inference with GPU-trained weights; it
+unlocks only after a completed run.
+
+* Bounds
+- Loopback only; Host and Origin checked; no CORS; empty JSON bodies only; no
+  caller-supplied parameters, paths or shaders. GET never starts a process.
+- One job at a time (409 otherwise); the server owns and can terminate it.
+- Events are the trainer's own stdout lines with a known ~event~ kind; other
+  output is ignored. No network assets.
+
+* Checks
+#+begin_example sh
+python3 -m unittest discover -s wasmer-gpu-demo/web/mnist -p 'test_*.py' -v
+node --check wasmer-gpu-demo/web/mnist/app.js
+node wasmer-gpu-demo/web/mnist/test_app.mjs
+#+end_example
+~test_app.mjs~ drives the Stop/Reset handlers against a stub server: a failed
+or refused reset keeps the captured results and the server's state on screen;
+only a confirmed idle clears the view. The server refuses a reset (HTTP 500)
+while the owned process has not exited, and reports a trainer that cannot be
+started (HTTP 503) as failed rather than running.
+Server tests stub only the trainer process. One real run driven through the
+server is recorded on the bead with the exact commit.

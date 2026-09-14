@@ -1,0 +1,42 @@
+#+title: One local app, three workbenches
+
+* Start
+From the repository root, build the three binaries once and start one server:
+#+begin_example sh
+cargo +stable build --release --locked --manifest-path wasmer-gpu-demo/Cargo.toml
+python3 wasmer-gpu-demo/web/hub/server.py
+#+end_example
+Open http://127.0.0.1:8764. Optional flags: ~--port~, ~--bin-dir~ (a directory
+containing gpu-smoke, gpu-image and gpu-mnist), ~--data-dir~ (official MNIST
+IDX files). The data directory is passed to both the trainer and the gallery.
+The binary and its build checkout's guest assets must stay unchanged during
+a demonstration. Ctrl-C stops the server and its owned training process.
+
+* Mounts
+The shell at ~/~ keeps three same-origin frames mounted after first use:
+~/compute/~, ~/image/~ and ~/mnist/~. No cross-port proxy or second web stack.
+Training and predictions survive tab switches; the same frame keeps its
+scroll position, controls and receipts. Arrow keys, Home and End switch tabs;
+~#image~, ~#compute~ and ~#mnist~ are direct tab links.
+
+The server delegates execution and validation to the existing subapp handlers,
+with request-local path/context only. It does not rewrite shared module state.
+Child assets/API requests are relative, so the original standalone servers on
+8765/8766/8767 still work. CSP permits framing only from this same origin;
+Host/Origin checks and per-operation request bounds remain in force.
+The shell has no timing animation or success simulation.
+
+* Checks
+#+begin_example sh
+python3 -m unittest discover -s wasmer-gpu-demo/web/hub -p 'test_*.py' -v
+python3 -m unittest discover -s wasmer-gpu-demo/web -p 'test_*.py' -v
+python3 -m unittest discover -s wasmer-gpu-demo/web/image -p 'test_*.py' -v
+python3 -m unittest discover -s wasmer-gpu-demo/web/mnist -p 'test_*.py' -v
+node wasmer-gpu-demo/web/mnist/test_app.mjs
+node --check wasmer-gpu-demo/web/hub/app.js
+#+end_example
+HTTP tests cover all mounts, real-handler dispatch with only execution stubbed,
+request guards, dataset context, events/reset and launch failure. Browser smoke:
+run Image Lab, start CNN training, switch to Compute and run it, return to
+Image Lab without losing its receipt, return to completed MNIST training and
+classify a digit. No reload of a child frame is needed to switch tabs.

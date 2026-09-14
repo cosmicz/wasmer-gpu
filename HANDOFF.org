@@ -1,0 +1,50 @@
+#+title: Wasmer GPU — technical handoff
+#+startup: overview
+
+* The proposition
+Wasmer guests can submit GPU workloads through a small native host bridge.
+The guest owns the kernel and computation; the host supplies the GPU device,
+resource handles, validation and transfers. Image processing and CNN training
+are two different demonstrations of that same boundary.
+
+This is a working prototype for discussion with Wasmer engineers, not a
+complete WebGPU package, production sandbox or new machine-learning platform.
+
+* Demonstrate it in under two minutes
+1. Start the app using [[file:README.org][the build/run instructions]]. Open http://127.0.0.1:8764.
+2. Image Lab: choose Edges, drag the reveal, then choose Blur. The receipt
+   identifies the actual native adapter, embedded guest and CPU comparison.
+3. MNIST: press Train. Watch the live loss and held-out predictions. The
+   browser can switch tabs without restarting or losing the training job.
+4. End on the real result. The recorded run reached 94% on 2,000 held-out
+   examples; do not promise an identical timing or general drawing accuracy.
+5. State the boundary: Wasmer WASIX guest -> host imports -> wgpu -> native
+   GPU. The browser is a local control surface, not where training runs.
+
+If a live run is impractical, use the two [[file:recordings/README.org][included recordings]], labelled
+as recordings. No cloud service, credentials or GPU service purchase is needed.
+
+* Code entry points
+- [[file:wasmer-gpu-demo/src/bridge.rs][bridge.rs]] — buffers, pipelines, dispatch, readback, limits and errors.
+- [[file:wasmer-gpu-demo/src/hook.rs][hook.rs]] — Wasmer WASIX InstantiationHook integration.
+- [[file:wasmer-gpu-demo/guest/image_filter.wat][image_filter.wat]] — guest-owned image kernels, embedded at build time.
+- [[file:wasmer-gpu-demo/guest/mnist-cnn/src/lib.rs][MNIST guest]] — the CNN's minibatch orchestration and guest kernels.
+- [[file:wasmer-gpu-demo/web/hub/server.py][hub/server.py]] — one loopback entry point for all three subapps.
+
+* Scope and next decision
+The six-call compute ABI is experimental. Native macOS Metal is tested;
+other hosts/backends, complete WebGPU coverage, cross-process GPU isolation
+and malicious-shader robustness are not established. The drawing pad uses
+CPU inference with this run's trained weights; it is not a GPU inference demo.
+Compute/MNIST binaries still require their build checkout's guest assets.
+
+Questions for Wasmer maintainers:
+- Is this InstantiationHook/resource boundary useful for an actual adopter?
+- Should the next iteration retain this small compute ABI or follow a specific
+  WASI/WebGPU interface, and what minimal workload would validate that choice?
+- What upstream ownership and portability requirements would make a reusable
+  package worthwhile?
+
+No additional demo is committed until those questions have a concrete answer.
+No public publication, organizer submission or maintainer contact is implied
+by this handoff. The configured GitHub repository remains private.

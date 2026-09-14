@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wasmer GPU — learning digits</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body data-state="idle">
+  <header class="masthead"><a href="/" class="wordmark">wasmer<span>gpu</span></a><span class="local"><i></i> Local training workbench · 127.0.0.1:8767</span></header>
+  <main>
+    <section class="intro">
+      <div>
+        <h1>Watch WebAssembly<br>learn to read.</h1>
+        <p>A Wasmer guest trains a small convolutional network on MNIST digits. Every layer's forward pass and every weight update is its own WGSL kernel on your native GPU. Nothing below is scripted: the numbers arrive from the running trainer.</p>
+      </div>
+      <div class="controls" role="group" aria-label="Training controls">
+        <button id="train" type="button">Train on my GPU <span aria-hidden="true">↗</span></button>
+        <button id="stop" type="button" class="quiet" disabled>Stop</button>
+        <button id="reset" type="button" class="quiet" disabled>Reset</button>
+        <p id="state-line" role="status" aria-live="polite">Idle. No run captured.</p>
+      </div>
+    </section>
+
+    <section class="stage" aria-label="Live training">
+      <div class="gallery-panel">
+        <div class="panel-heading"><h2>Held-out digits, as the model sees them</h2><span id="gallery-note">Predictions appear after the first evaluation.</span></div>
+        <ol id="gallery" class="gallery" aria-live="off"></ol>
+      </div>
+      <div class="trace-panel">
+        <div class="panel-heading"><h2>Loss, step by step</h2><span id="trace-note">No points yet.</span></div>
+        <svg id="trace" viewBox="0 0 640 300" role="img" aria-labelledby="trace-title"><title id="trace-title">Training loss per reported step and held-out accuracy per evaluation</title>
+          <g id="trace-grid"></g>
+          <polyline id="loss-line" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linejoin="round" points=""></polyline>
+          <g id="acc-marks"></g>
+          <text id="axis-left" x="8" y="18" class="axis">loss</text>
+          <text id="axis-right" x="632" y="18" class="axis" text-anchor="end">held-out accuracy</text>
+        </svg>
+        <dl class="metrics">
+          <div><dt>Step</dt><dd id="m-step">—</dd></div>
+          <div><dt>Samples seen</dt><dd id="m-samples">—</dd></div>
+          <div><dt>Batch loss</dt><dd id="m-loss">—</dd></div>
+          <div><dt>Held-out accuracy</dt><dd id="m-acc">—</dd></div>
+          <div><dt>Elapsed</dt><dd id="m-elapsed">—</dd></div>
+          <div><dt>Learning rate</dt><dd id="m-lr">—</dd></div>
+        </dl>
+        <p class="hint" id="adapter-line">Adapter identified when training starts.</p>
+        <p id="verdict" class="verdict"></p>
+      </div>
+    </section>
+
+    <section class="pad-section" aria-labelledby="pad-title">
+      <div>
+        <h2 id="pad-title">Draw a digit</h2>
+        <p class="hint">Classified in this browser with the weights the GPU just trained. This part is CPU inference, not the GPU path, and it unlocks only after a completed run.</p>
+        <div class="pad-controls"><button id="classify" type="button" disabled>Classify</button><button id="clear" type="button" class="quiet">Clear</button></div>
+      </div>
+      <canvas id="pad" width="28" height="28" tabindex="0" aria-label="Drawing pad, 28 by 28 pixels. Draw with the pointer."></canvas>
+      <ol id="pad-result" class="bars" aria-live="polite"><li class="pending">No sketch classified.</li></ol>
+    </section>
+
+    <section class="details-grid">
+      <div><h2>What this proves, exactly</h2><p id="proof">The trainer is a Wasmer WASIX guest. It owns the parameters on the GPU and drives every minibatch: it writes the batch into its buffer and dispatches its own kernels through <code>wasmer_gpu_v0</code>: conv 5x5 with 8 filters and ReLU, 2x2 max-pool, a fully connected layer to 10 classes with softmax, and the matching gradient and SGD kernels. The host feeds raw MNIST bytes and reads numbers back. Train split: first 12,000 official training images; held-out: first 2,000 official test images, never trained on.</p><p id="model-line">Model: reported by the trainer when a run starts.</p><p>Not here: a second conv layer, shuffling, data augmentation, or any speedup claim. Timings are wall-clock on a small model.</p></div>
+      <div><h2>Trainer events</h2><details open><summary>Raw event stream (newest last)</summary><pre id="raw">No events.</pre></details></div>
+    </section>
+  </main>
+  <footer><span>Built for the Wasmer sponsor track</span><span>Hackathons.team · September 2026</span></footer>
+</body>
+</html>

@@ -1,0 +1,18 @@
+[package]
+name = "mnist_cnn_guest"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Built separately for wasm32-unknown-unknown; see ../../docs/MNIST.org.
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[profile.release]
+opt-level = "s"
+panic = "abort"
+lto = true
+codegen-units = 1
+
+[workspace]

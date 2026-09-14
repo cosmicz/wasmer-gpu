@@ -1,0 +1,5 @@
+/* The shell owns the masthead; each application keeps its own content/scroll. */
+.masthead, body > footer { display: none; }
+main { padding-bottom: 28px; }
+.intro { padding-top: 28px; padding-bottom: 28px; }
+.intro h1 { font-size: clamp(32px, 4vw, 48px); letter-spacing: -1.8px; }

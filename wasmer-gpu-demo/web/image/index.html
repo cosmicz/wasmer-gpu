@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wasmer GPU — image workbench</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <a href="/" class="wordmark">wasmer<span>gpu</span></a>
+    <span class="local"><i></i> Image workbench · 127.0.0.1</span>
+  </header>
+  <main class="workbench">
+    <aside class="rail">
+      <h1>Filter<br><em>on the chip.</em></h1>
+      <p class="lede">A WASIX guest hands its own WGSL to your native GPU. Every pixel that comes back is checked against a CPU reference.</p>
+
+      <div class="presets" role="group" aria-label="Filter presets">
+        <button type="button" class="preset" data-filter="blur"><span class="name">Blur</span><span class="how">Binomial, radius 1–5</span></button>
+        <button type="button" class="preset" data-filter="edges"><span class="name">Edges</span><span class="how">Sobel gradient</span></button>
+        <button type="button" class="preset" data-filter="emboss"><span class="name">Emboss</span><span class="how">Diagonal relief</span></button>
+      </div>
+
+      <label class="param" for="param">
+        <span class="param-label"><span id="param-name">Gain</span><output id="param-out" for="param">2</output></span>
+        <input type="range" id="param" min="1" max="16" value="2">
+      </label>
+
+      <fieldset class="source">
+        <legend>Picture</legend>
+        <label class="choice"><input type="radio" name="source" value="generated" checked> Generated glacier valley</label>
+        <label class="choice"><input type="radio" name="source" value="file"> A file from this computer</label>
+        <label class="file"><input type="file" id="file" accept="image/*"><span id="file-name">Choose an image…</span></label>
+        <p class="hint" id="source-hint">Decoded and downscaled to 512 px in your browser, sent only to this loopback server.</p>
+      </fieldset>
+
+      <p class="note">Runs real native compute. No cloud, no upload beyond 127.0.0.1, no browser GPU.</p>
+    </aside>
+
+    <section class="stage" aria-live="polite">
+      <div class="compare" id="compare" style="--reveal: 50%">
+        <canvas id="before" width="512" height="384" aria-label="Guest input"></canvas>
+        <canvas id="after" width="512" height="384" aria-label="GPU output"></canvas>
+        <div class="divider" aria-hidden="true"><span class="grip"></span></div>
+        <span class="tag tag-before" aria-hidden="true">Guest input</span>
+        <span class="tag tag-after" aria-hidden="true">GPU output</span>
+        <input type="range" class="scrub" id="scrub" min="0" max="100" value="50" step="0.1" aria-label="Reveal GPU output" disabled>
+        <div class="scan" aria-hidden="true"></div>
+        <div class="idle" id="idle">
+          <p><strong>Nothing has run yet.</strong><br>Pick a preset. The runner generates the scene, the guest filters it on the GPU, and both pictures land here.</p>
+        </div>
+      </div>
+
+      <footer class="receipt" id="receipt">
+        <p class="verdict" id="verdict">Waiting for the first run.</p>
+        <dl class="facts">
+          <div><dt>Adapter</dt><dd id="adapter">—</dd></div>
+          <div><dt>Guest</dt><dd id="guest">—</dd></div>
+          <div><dt>Pixels</dt><dd id="pixels">—</dd></div>
+          <div><dt>Executable</dt><dd id="binary">—</dd></div>
+        </dl>
+        <ol class="timings" aria-label="Measured costs">
+          <li><span>Setup</span><b id="t-setup">—</b></li>
+          <li><span>Upload</span><b id="t-upload">—</b></li>
+          <li><span>Pipeline</span><b id="t-pipeline">—</b></li>
+          <li class="hot"><span>Dispatch</span><b id="t-dispatch">—</b></li>
+          <li><span>Readback</span><b id="t-readback">—</b></li>
+          <li><span>CPU reference</span><b id="t-cpu">—</b></li>
+        </ol>
+        <p class="fine">Wall-clock around each bridge call on a small image; not a speedup claim. Kernels are integer-only so the CPU comparison is exact.</p>
+      </footer>
+    </section>
+  </main>
+</body>
+</html>

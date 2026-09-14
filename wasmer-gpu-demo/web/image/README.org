@@ -1,0 +1,73 @@
+#+title: Image workbench (local browser surface)
+
+* Run
+From the repository checkout:
+#+begin_example sh
+cargo +stable build --release --locked --manifest-path wasmer-gpu-demo/Cargo.toml
+python3 wasmer-gpu-demo/web/image/server.py
+#+end_example
+Open http://127.0.0.1:8766 and choose *Blur*, *Edges* or *Emboss*. The
+slider sets the blur radius (1-5, binomial kernel of 2r+1), the Sobel gain
+or the emboss relief (1-16). The page
+draws the exact RGBA8 bytes the runner returns into two canvases and reveals
+the GPU output with a draggable divider; no CSS filter is involved. A prebuilt
+executable may be selected with ~--binary /absolute/path/to/gpu-image~;
+~--port~ changes the loopback port. Stop the server with Ctrl-C.
+
+The browser is a control surface, not the execution backend:
+#+begin_example
+Browser -> loopback HTTP -> gpu-image --json -> WASIX guest (image_filter.wat)
+        -> wasmer_gpu_v0 -> wgpu -> native GPU -> pixels back -> CPU reference check
+#+end_example
+Each preset click runs the executable once. The guest module is embedded in
+the executable at build time (~include_str!~), so the executable's SHA-256 in
+every receipt identifies the exact WGSL that ran; the report also carries the
+guest's byte count and FNV-1a fingerprint, and nothing is read from the
+checkout at run time. The guest module carries every WGSL kernel in its own
+data segments; the runner writes a 16-byte header and
+the input pixels into guest memory, the guest uploads that region as one
+storage buffer, dispatches the selected kernel, reads the buffer back and
+releases both handles. The runner then compares every output pixel with an
+integer CPU implementation of the same filter, so ~matches~ is exact. Filters
+act on RGB; the source alpha of every pixel is carried through unchanged by
+the kernels and the reference, and the test suite checks that with an input
+whose alpha varies per pixel.
+
+* Picture sources
+- *Generated glacier valley*: a deterministic procedural scene built inside
+  the runner (512x384, value-noise sky, ridges, lake, grain).
+- *A file from this computer*: decoded and downscaled to at most 512 px per
+  side by the browser, sent as raw RGBA8 base64 to 127.0.0.1 only, written to
+  a temporary file for the runner and deleted after the run. Nothing leaves
+  the machine.
+
+* Bounds
+- Only ~127.0.0.1~, one fixed executable, no shader text from HTTP. The
+  request carries only a preset name, an integer 1-16 and bounded pixels.
+- Host and Origin checked; body capped at one 512x512 image; one active run;
+  30-second subprocess timeout. GET never invokes the GPU.
+- Nonzero exit, malformed report, GPU/CPU mismatch, wrong preset, leaked
+  resources and executable drift fail visibly with no fabricated picture.
+- No network assets or frontend dependencies.
+
+* Checks
+#+begin_example sh
+python3 -m unittest discover -s wasmer-gpu-demo/web/image -p 'test_*.py' -v
+node --check wasmer-gpu-demo/web/image/app.js
+cargo +stable test --release --manifest-path wasmer-gpu-demo/Cargo.toml --test image_cli
+cargo +stable run --release --bin gpu-image --manifest-path wasmer-gpu-demo/Cargo.toml -- --filter edges
+cargo +stable run --release --bin gpu-image --manifest-path wasmer-gpu-demo/Cargo.toml -- --filter blur --control wrong-shader
+#+end_example
+The last command must exit nonzero: the guest's identity kernel is not blur,
+and the runner reports the mismatch. ~--control no-dispatch~ does the same
+without touching the GPU.
+
+* Design
+Same glacier/sapphire family as the console at ~web/~: glacier ~#e7f1ff~,
+paper ~#fcfdff~, sapphire ~#1848e5~, ink ~#172947~, slate ~#58677c~, violet
+~#8f62de~ for focus. Editorial serif (Iowan Old Style / Palatino) for the
+headline and preset names, Avenir Next for the interface, monospace for
+measured numbers only. The picture is the page: the comparison stage takes
+the whole right column and the receipt underneath states adapter, guest,
+pixel counts and separated setup/upload/pipeline/dispatch/readback/CPU costs.
+Idle and failure states show no fabricated output. Reduced motion respected.

@@ -1,0 +1,31 @@
+#+title: Demo recordings
+
+* Selected clips
+- [[file:take-2-image-demo.mp4][Image Lab]] — 61.733 seconds, 1600x1000, 30fps, silent.
+  Edges, emboss and blur on a real native GPU with a live before/after reveal.
+  This is the smoother second take selected by the operator.
+- [[file:mnist-training.mp4][MNIST training]] — 26.5 seconds, 1600x1000, 30fps, silent.
+  A fresh 600-step CNN training run: 94% held-out accuracy, 18.873 seconds on
+  Apple M2 Max / Metal. The clip ends on the result, before the drawing segment.
+
+No speed changes, simulated metrics or pretrained-result animation. Both MP4s
+were fully decoded successfully; sampled frames and their final views were
+inspected. These recordings predate the final control/provenance fixes; the
+MNIST trainer and recorded numerical result are unchanged, and neither clip
+is a verification claim about those later fixes.
+
+* Limitations and retained takes
+The full MNIST take includes a pointer-drawn seven classified as two (81.6%).
+That result remains in the local full take; the selected training-only clip
+makes no successful drawing-inference claim. The first image take had visual
+artifacts reported by the operator and is not the selected clip.
+
+Both rough takes are retained locally in this directory, excluded from Git:
+~take-1-image-demo.mp4~ and ~take-1-mnist-training.mp4~.
+Raw timing, trainer and capture receipts are retained separately by the author.
+
+* File integrity
+#+begin_example
+b3a8ad2c2940458c8d8a1e0773d3a92cfaebeed34ce24b0eede4d48f971034e5  mnist-training.mp4
+cb7dd1b62193cd72e7daeba999d7d34f67da58baa8d3c5402489dabf6c7169de  take-2-image-demo.mp4
+#+end_example
