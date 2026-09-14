@@ -17,6 +17,30 @@ their GPU work reaches the native adapter through ~wgpu~. The MNIST drawing
 pad runs inference in the browser using the parameters from the real training
 run. There is no cloud service, browser-GPU simulation or canned training trace.
 
+* Screenshots
+Real captures from the local three-tab application.
+
+** Image Lab
+Guest-supplied edge detection on the native GPU, with a before/after reveal
+and pixel-for-pixel verification against the CPU reference.
+
+#+attr_html: :width 1000 :alt Image Lab showing a glacier scene beside its GPU edge-detection result
+[[file:docs/images/image-lab.png]]
+
+** MNIST training
+A completed CNN run: 600 steps, 94% held-out accuracy, live predictions and
+the recorded loss curve. These are observed results from this run.
+
+#+attr_html: :width 1000 :alt MNIST training dashboard with digit predictions, loss curve and 94 percent held-out accuracy
+[[file:docs/images/mnist-training.png]]
+
+** Compute
+The Wasmer-to-GPU path, independently checked output and measured dispatch
+costs. Tiny workloads demonstrate the bridge, not a speedup claim.
+
+#+attr_html: :width 1000 :alt Compute tab showing the Wasmer guest to native GPU bridge and matching CPU and GPU results
+[[file:docs/images/compute.png]]
+
 * Watch it
 - [[file:recordings/take-2-image-demo.mp4][Image processing]] — 62 seconds: edges, emboss, blur and the live reveal.
 - [[file:recordings/mnist-training.mp4][MNIST training]] — 27 seconds: a fresh CNN run reaching 94% held-out accuracy.
